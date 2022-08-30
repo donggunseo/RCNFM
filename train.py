@@ -36,8 +36,8 @@ def train(model, args, train_dataset):
             model.train()
             label = batch[2].to(args.device)
             id = batch[3]
-            inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
-            outputs = model(**inputs)
+            # inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
+            outputs = model(batch[0].to(args.device), batch[1].to(args.device))
             loss = criterion(outputs, label)
             loss = loss/args.gradient_accumulation_steps
             scaler.scale(loss).backward()
@@ -90,10 +90,12 @@ def main():
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(args.device)
     args.n_gpu = torch.cuda.device_count()
     config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
     config.gradient_checkpointing = True
     model = RECSE_Model(args, config)
+    print(args.n_gpu)
     if args.n_gpu > 1:
         model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
     model.to(args.device)
