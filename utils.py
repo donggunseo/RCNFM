@@ -15,8 +15,9 @@ def collate_fn(batch):
     input_mask = [[1.0] * len(f["input_ids"]) + [0.0] * (max_len - len(f["input_ids"])) for f in batch]
     labels = [f["labels"] for f in batch]
     ids = [f["id"] for f in batch]
+    label_oris = [f['label_ori'] for f in batch]
     input_ids = torch.tensor(input_ids, dtype=torch.long)
     input_mask = torch.tensor(input_mask, dtype=torch.float)
     labels = torch.tensor(labels, dtype=torch.long)
-    output = (input_ids, input_mask, labels, ids)
+    output = (input_ids, input_mask, labels, ids, label_oris)
     return output

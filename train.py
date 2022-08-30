@@ -14,9 +14,10 @@ import numpy as np
 from model import RECSE_Model
 from torch.cuda.amp import GradScaler
 from dataset import RE_dataset
+from collections import defaultdict
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
-def train(model, args, train_dataset):
+def train(model, args, train_dataset, eval_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
     warmup_steps = int(total_steps * args.warmup_ratio)
@@ -35,7 +36,6 @@ def train(model, args, train_dataset):
         for step, batch in enumerate(tqdm(dataloader)):
             model.train()
             label = batch[2].to(args.device)
-            id = batch[3]
             inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
             outputs = model(**inputs)
             loss = criterion(outputs, label)
@@ -52,6 +52,55 @@ def train(model, args, train_dataset):
                 model.zero_grad()
                 wandb.log({'loss': loss.item()}, step=num_steps)
                 print(f"step {num_steps} loss : {loss.item()}")
+            if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
+                evaluate(model, args, eval_dataset, num_steps)
+
+def evaluate(model, args, test_dataset, num_steps):
+    dataloader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last = False)
+    answer = test_dataset.answer
+    logits = []
+    preds = []
+    ids = []
+    labels = []
+    label_oris = []
+    for i, batch in enumerate(tqdm(dataloader)):
+        model.eval()
+        label = batch[2]
+        id = batch[3]
+        label_ori = batch[4]
+        inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
+        with torch.no_grad():
+            logit = model(**inputs)
+            pred = torch.argmax(logit, dim=-1)
+        logits+=logit.tolist()
+        preds+=pred.tolist()
+        ids+=id
+        labels+=label.tolist()
+        label_oris+=label_ori
+    data_edge = [0]
+    final_pred = []
+    for i in range(len(ids)-1):
+        if ids[i]!=ids[i+1]:
+            data_edge.append(i+1)
+    for i in range(len(data_edge)-1):
+        cur_pred = preds[data_edge[i]:data_edge[i+1]]
+        cur_logit = logits[data_edge[i]:data_edge[i+1]]
+        cur_labels = labels[data_edge[i]:data_edge[i+1]]
+        cur_ori = label_oris[data_edge[i]:data_edge[i+1]]
+        temp_pred = []
+        for i in range(len(cur_pred)):
+            if cur_pred[i]==1:
+                temp_pred.append((cur_logit[i][1], cur_ori[i]))
+        if len(temp_pred)==0:
+            final_pred.append(0)
+        elif len(temp_pred)==1:
+            final_pred.append(temp_pred[0][1])
+        else:
+            temp_pred = sorted(temp_pred, key = lambda x : x[0], reverse=True)
+            final_pred.append(temp_pred[0][1])
+    f1 = f1_score(answer, final_pred, average = 'micro')
+    print(f"f1 score : {f1}")
+    wandb.log({'f1' : f1}, step = num_steps)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -62,9 +111,9 @@ def main():
     parser.add_argument("--max_seq_length", default=512, type=int,
                         help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated.")
 
-    parser.add_argument("--train_batch_size", default=16, type=int,
+    parser.add_argument("--train_batch_size", default=32, type=int,
                         help="Batch size for training.")
-    parser.add_argument("--test_batch_size", default=16, type=int,
+    parser.add_argument("--test_batch_size", default=32, type=int,
                         help="Batch size for testing.")
     parser.add_argument("--learning_rate", default=3e-5, type=float,
                         help="The initial learning rate for Adam.")
@@ -102,10 +151,12 @@ def main():
     model.to(args.device)
     set_seed(args)
     train_dataset = RE_dataset(args)
-    # eval_dataset = RE_dataset(args, do_eval = True)
-    # test_dataset = RE_dataset(args, do_eval = True, do_test = True)
+    eval_dataset = RE_dataset(args, do_eval = True)
+    test_dataset = RE_dataset(args, do_eval = True, do_test = True)
 
-    train(model, args, train_dataset)
+    train(model, args, train_dataset, eval_dataset)
+
+    evaluate(model, args, test_dataset, 0)
 
 if __name__ == "__main__":
     main()

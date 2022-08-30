@@ -25,6 +25,7 @@ class RE_dataset(Dataset):
         self.label = []
         self.id = []
         self.label_ori = []
+        self.answer = []
         with open('../data/relation/l2i.json', 'r') as f:
             self.l2i = json.load(f)
         with open('../data/relation/entity_pair_text.pkl', 'rb') as f2:
@@ -46,6 +47,7 @@ class RE_dataset(Dataset):
     def initialize(self):
         with open(self.file_path, 'r') as file:
             data = json.load(file)
+        print(len(data))
         for d in tqdm(data):
             ss, se = d['subj_start'], d['subj_end']
             os, oe = d['obj_start'], d['obj_end']
@@ -99,7 +101,8 @@ class RE_dataset(Dataset):
             self.data.extend(s)
             self.label.extend(label_list)
             self.id.extend([id for _ in range(len(label_sentence_list))])
-            self.label_ori.append(label)
+            self.label_ori.extend([self.l2i[k] for k in label_text_dict.keys()])
+            self.answer.append(label)
     def __len__(self):
         return len(self.data)
     def __getitem__(self, idx):
@@ -108,6 +111,6 @@ class RE_dataset(Dataset):
         cls = self.tokenizer.convert_tokens_to_ids(['[CLS]'])
         sep = self.tokenizer.convert_tokens_to_ids(['[SEP]'])
         s = cls + s1 + sep + s2
-        return {'input_ids': s, 'labels' : self.label[idx], 'id' : self.id[idx]}
+        return {'input_ids': s, 'labels' : self.label[idx], 'id' : self.id[idx], 'label_ori' : self.label_ori[idx]}
 
 
