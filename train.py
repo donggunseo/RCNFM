@@ -36,10 +36,8 @@ def train(model, args, train_dataset):
             model.train()
             label = batch[2].to(args.device)
             id = batch[3]
-            # inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
-            print(batch[0].shape)
-            print(batch[1].shape)
-            outputs = model(batch[0].to(args.device), batch[1].to(args.device))
+            inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
+            outputs = model(**inputs)
             loss = criterion(outputs, label)
             loss = loss/args.gradient_accumulation_steps
             scaler.scale(loss).backward()
@@ -53,6 +51,7 @@ def train(model, args, train_dataset):
                 scheduler.step()
                 model.zero_grad()
                 wandb.log({'loss': loss.item()}, step=num_steps)
+                print(f"step {num_steps} loss : {loss.item()}")
 
 def main():
     parser = argparse.ArgumentParser()
