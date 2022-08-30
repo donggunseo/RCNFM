@@ -37,6 +37,8 @@ def train(model, args, train_dataset):
             label = batch[2].to(args.device)
             id = batch[3]
             # inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
+            print(batch[0].shape)
+            print(batch[1].shape)
             outputs = model(batch[0].to(args.device), batch[1].to(args.device))
             loss = criterion(outputs, label)
             loss = loss/args.gradient_accumulation_steps
