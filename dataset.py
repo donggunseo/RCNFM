@@ -1,4 +1,3 @@
-from re import T
 import torch
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer

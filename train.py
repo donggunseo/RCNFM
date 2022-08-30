@@ -95,7 +95,7 @@ def main():
     if args.n_gpu > 1:
         model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
     model.to(device)
-
+    set_seed(args.seed)
     train_dataset = RE_dataset(args)
     eval_dataset = RE_dataset(args, do_eval = True)
     test_dataset = RE_dataset(args, do_eval = True, do_test = True)
