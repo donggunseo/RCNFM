@@ -108,7 +108,6 @@ class RE_dataset(Dataset):
         cls = self.tokenizer.convert_tokens_to_ids(['[CLS]'])
         sep = self.tokenizer.convert_tokens_to_ids(['[SEP]'])
         s = cls + s1 + sep + s2
-        s = s[:self.args.max_seq_length]
         return {'input_ids': s, 'labels' : self.label[idx], 'id' : self.id[idx]}
 
 

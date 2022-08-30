@@ -97,8 +97,8 @@ def main():
     model.to(device)
     set_seed(args)
     train_dataset = RE_dataset(args)
-    eval_dataset = RE_dataset(args, do_eval = True)
-    test_dataset = RE_dataset(args, do_eval = True, do_test = True)
+    # eval_dataset = RE_dataset(args, do_eval = True)
+    # test_dataset = RE_dataset(args, do_eval = True, do_test = True)
 
     train(model, args, train_dataset)
 
