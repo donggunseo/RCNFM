@@ -94,7 +94,7 @@ def main():
     model = RECSE_Model(args, config)
     if args.n_gpu > 1:
         model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
-    model.to(device)
+    model.to(args.device)
     set_seed(args)
     train_dataset = RE_dataset(args)
     # eval_dataset = RE_dataset(args, do_eval = True)
