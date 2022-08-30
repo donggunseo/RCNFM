@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import wandb
@@ -14,6 +15,7 @@ from model import RECSE_Model
 from torch.cuda.amp import GradScaler
 from dataset import RE_dataset
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
 def train(model, args, train_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
