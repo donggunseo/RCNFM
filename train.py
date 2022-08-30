@@ -55,7 +55,7 @@ def train(model, args, train_dataset, eval_dataset):
             if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
                 evaluate(model, args, eval_dataset, num_steps)
 
-def evaluate(model, args, test_dataset, num_steps):
+def evaluate(model, args, test_dataset, num_steps, flag=True):
     dataloader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last = False)
     answer = test_dataset.answer
     logits = []
@@ -100,7 +100,10 @@ def evaluate(model, args, test_dataset, num_steps):
             final_pred.append(temp_pred[0][1])
     f1 = f1_score(answer, final_pred, average = 'micro')
     print(f"f1 score : {f1}")
-    wandb.log({'f1' : f1}, step = num_steps)
+    if flag:
+        wandb.log({'eval f1' : f1}, step = num_steps)
+    else:
+        wandb.log({'test f1' : f1}, step = num_steps)
 
 def main():
     parser = argparse.ArgumentParser()
