@@ -9,20 +9,19 @@ from tqdm import tqdm
 import pickle
 
 class RE_dataset(Dataset):
-    def __init__(self, tokenizer, args=None, do_eval=False, do_test=False):
+    def __init__(self, args, do_eval=False, do_test=False):
         if not do_eval:
-            file_path = os.path.join('../data/tacred', 'train.json')
+            file_path = os.path.join(args.data_dir, 'train.json')
         elif not do_test:
-            file_path = os.path.join('../data/tacred', 'dev.json')
+            file_path = os.path.join(args.data_dir, 'dev.json')
         else:
-            file_path = os.path.join('../data/tacred', 'test.json')
+            file_path = os.path.join(args.data_dir, 'test.json')
         assert os.path.isfile(file_path)
 
         self.file_path = file_path
-        self.args = args
         self.evaluate = do_eval
         self.test = do_test
-        self.tokenizer = tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
         self.data = []
         self.label = []
         self.id = []
@@ -110,6 +109,7 @@ class RE_dataset(Dataset):
         cls = self.tokenizer.convert_tokens_to_ids(['[CLS]'])
         sep = self.tokenizer.convert_tokens_to_ids(['[SEP]'])
         s = cls + s1 + sep + s2
+        s = s[:self.args.max_seq_length]
         return {'input_ids': s, 'labels' : self.label[idx], 'id' : self.id[idx]}
 
 

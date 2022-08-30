@@ -12,6 +12,7 @@ import os
 import numpy as np
 from model import RECSE_Model
 from torch.cuda.amp import GradScaler
+from dataset import RE_dataset
 
 def train(model, args, train_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
@@ -48,6 +49,62 @@ def train(model, args, train_dataset):
                 scheduler.step()
                 model.zero_grad()
                 wandb.log({'loss': loss.item()}, step=num_steps)
+
+def main():
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--data_dir", default="./data/tacred", type=str)
+    parser.add_argument("--model_name_or_path", default="roberta-large", type=str)
+
+    parser.add_argument("--max_seq_length", default=512, type=int,
+                        help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated.")
+
+    parser.add_argument("--train_batch_size", default=32, type=int,
+                        help="Batch size for training.")
+    parser.add_argument("--test_batch_size", default=32, type=int,
+                        help="Batch size for testing.")
+    parser.add_argument("--learning_rate", default=3e-5, type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--gradient_accumulation_steps", default=2, type=int,
+                        help="Number of updates steps to accumulate the gradients for, before performing a backward/update pass.")
+    parser.add_argument("--adam_epsilon", default=1e-6, type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm", default=1.0, type=float,
+                        help="Max gradient norm.")
+    parser.add_argument("--warmup_ratio", default=0.1, type=float,
+                        help="Warm up ratio for Adam.")
+    parser.add_argument("--num_train_epochs", default=5.0, type=float,
+                        help="Total number of training epochs to perform.")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="random seed for initialization")
+    parser.add_argument("--num_class", type=int, default=42)
+    parser.add_argument("--evaluation_steps", type=int, default=500,
+                        help="Number of steps to evaluate the model")
+
+    parser.add_argument("--dropout_prob", type=float, default=0.1)
+    parser.add_argument("--project_name", type=str, default="RECSE")
+    parser.add_argument("--run_name", type=str, default="tacred")
+
+    args = parser.parse_args()
+    wandb.init(project=args.project_name, name=args.run_name)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args.n_gpu = torch.cuda.device_count()
+    config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
+    config.gradient_checkpointing = True
+    model = RECSE_Model(args, config)
+    if args.n_gpu > 1:
+        model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
+    model.to(device)
+
+    train_dataset = RE_dataset(args)
+    eval_dataset = RE_dataset(args, do_eval = True)
+    test_dataset = RE_dataset(args, do_eval = True, do_test = True)
+
+    train(model, args, train_dataset)
+
+if __name__ == "__main__":
+    main()
+
 
 
 

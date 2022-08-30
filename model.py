@@ -6,13 +6,15 @@ from torch.cuda.amp import autocast
 
 class RECSE_Model(nn.Module):
     def __init__(self, args=None, config=None):
-        self.model_type = args.model_type
-        self.model = AutoModel.from_pretrained(self.model_type, config=config)
+        self.model_name_or_path= args.model_name_or_path
+        self.model = AutoModel.from_pretrained(self.model_name_or_path, config=config)
         self.classifier = nn.Linear(1024, 2)
+        self.dropout = nn.Dropout(args.dropout_prob)
     
     @autocast
     def forward(self, input_ids=None, attention_mask=None):
         output = self.model(input_ids, attention_mask = attention_mask)
         pooled_cls_output = output[0][:,0]
+        pooled_cls_output = self.dropout(pooled_cls_output)
         cls_output = self.classifier(pooled_cls_output)
         return cls_output
