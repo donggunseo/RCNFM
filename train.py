@@ -82,6 +82,7 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
     for i in range(len(ids)-1):
         if ids[i]!=ids[i+1]:
             data_edge.append(i+1)
+    data_edge.append(len(ids))
     for i in range(len(data_edge)-1):
         cur_pred = preds[data_edge[i]:data_edge[i+1]]
         cur_logit = logits[data_edge[i]:data_edge[i+1]]
@@ -159,7 +160,7 @@ def main():
 
     train(model, args, train_dataset, eval_dataset)
 
-    evaluate(model, args, test_dataset, 0)
+    evaluate(model, args, test_dataset, 0, False)
 
 if __name__ == "__main__":
     main()
