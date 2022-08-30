@@ -12,7 +12,7 @@ class RECSE_Model(nn.Module):
         self.classifier = nn.Linear(1024, 2)
         self.dropout = nn.Dropout(args.dropout_prob)
     
-    @autocast
+    @autocast()
     def forward(self, input_ids=None, attention_mask=None):
         output = self.model(input_ids, attention_mask = attention_mask)
         pooled_cls_output = output[0][:,0]
