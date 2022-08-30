@@ -87,7 +87,7 @@ def main():
 
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     args.n_gpu = torch.cuda.device_count()
     config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
     config.gradient_checkpointing = True
