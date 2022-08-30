@@ -6,6 +6,7 @@ from torch.cuda.amp import autocast
 
 class RECSE_Model(nn.Module):
     def __init__(self, args=None, config=None):
+        super().__init__()
         self.model_name_or_path= args.model_name_or_path
         self.model = AutoModel.from_pretrained(self.model_name_or_path, config=config)
         self.classifier = nn.Linear(1024, 2)
