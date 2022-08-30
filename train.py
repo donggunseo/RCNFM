@@ -53,7 +53,7 @@ def train(model, args, train_dataset):
 def main():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--data_dir", default="./data/tacred", type=str)
+    parser.add_argument("--data_dir", default="../data/tacred", type=str)
     parser.add_argument("--model_name_or_path", default='ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli', type=str)
 
     parser.add_argument("--max_seq_length", default=512, type=int,
