@@ -1,3 +1,4 @@
+from cgi import test
 import os
 import torch
 import torch.nn as nn
@@ -17,7 +18,7 @@ from dataset import RE_dataset
 from collections import defaultdict
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
-def train(model, args, train_dataset, eval_dataset):
+def train(model, args, train_dataset, eval_dataset, test_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
     warmup_steps = int(total_steps * args.warmup_ratio)
@@ -51,9 +52,9 @@ def train(model, args, train_dataset, eval_dataset):
                 scheduler.step()
                 model.zero_grad()
                 wandb.log({'loss': loss.item()}, step=num_steps)
-                print(f"step {num_steps} loss : {loss.item()}")
             if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
                 evaluate(model, args, eval_dataset, num_steps)
+                evaluate(model, args, test_dataset, num_steps, False)
 
 def evaluate(model, args, test_dataset, num_steps, flag=True):
     dataloader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last = False)
@@ -158,7 +159,7 @@ def main():
     eval_dataset = RE_dataset(args, do_eval = True)
     test_dataset = RE_dataset(args, do_eval = True, do_test = True)
 
-    train(model, args, train_dataset, eval_dataset)
+    train(model, args, train_dataset, eval_dataset, test_dataset)
 
     evaluate(model, args, test_dataset, 0, False)
 
