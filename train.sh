@@ -1,0 +1,1 @@
+python train.py --run_name tacred_batch64

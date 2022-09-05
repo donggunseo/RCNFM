@@ -47,7 +47,6 @@ class RE_dataset(Dataset):
     def initialize(self):
         with open(self.file_path, 'r') as file:
             data = json.load(file)
-        print(len(data))
         for d in tqdm(data):
             ss, se = d['subj_start'], d['subj_end']
             os, oe = d['obj_start'], d['obj_end']

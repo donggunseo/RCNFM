@@ -15,10 +15,11 @@ import numpy as np
 from model import RECSE_Model
 from torch.cuda.amp import GradScaler
 from dataset import RE_dataset
-from collections import defaultdict
+from collections import Counter
+import json
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
-def train(model, args, train_dataset, eval_dataset, test_dataset):
+def train(model, args, train_dataset, eval_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
     warmup_steps = int(total_steps * args.warmup_ratio)
@@ -32,6 +33,7 @@ def train(model, args, train_dataset, eval_dataset, test_dataset):
     
 
     num_steps = 0
+    best_f1 = -1
     for epoch in range(int(args.num_train_epochs)):
         model.zero_grad()
         for step, batch in enumerate(tqdm(dataloader)):
@@ -52,11 +54,14 @@ def train(model, args, train_dataset, eval_dataset, test_dataset):
                 scheduler.step()
                 model.zero_grad()
                 wandb.log({'loss': loss.item()}, step=num_steps)
-            if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
-                evaluate(model, args, eval_dataset, num_steps)
-                evaluate(model, args, test_dataset, num_steps, False)
+            # if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
+        f1 = evaluate(model, args, eval_dataset, num_steps)
+        if best_f1<f1:
+            torch.save(model.state_dict(), args.save_path)
+            best_f1 = f1
 
 def evaluate(model, args, test_dataset, num_steps, flag=True):
+    softmax = torch.nn.Softmax(dim=-1)
     dataloader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last = False)
     answer = test_dataset.answer
     logits = []
@@ -72,6 +77,7 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
         inputs = {'input_ids': batch[0].to(args.device), 'attention_mask': batch[1].to(args.device)}
         with torch.no_grad():
             logit = model(**inputs)
+            logit = softmax(logit)
             pred = torch.argmax(logit, dim=-1)
         logits+=logit.tolist()
         preds+=pred.tolist()
@@ -84,28 +90,38 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
         if ids[i]!=ids[i+1]:
             data_edge.append(i+1)
     data_edge.append(len(ids))
+    final_json = {}
     for i in range(len(data_edge)-1):
         cur_pred = preds[data_edge[i]:data_edge[i+1]]
         cur_logit = logits[data_edge[i]:data_edge[i+1]]
-        cur_labels = labels[data_edge[i]:data_edge[i+1]]
         cur_ori = label_oris[data_edge[i]:data_edge[i+1]]
         temp_pred = []
+        temp_pred2 = {}
         for i in range(len(cur_pred)):
             if cur_pred[i]==1:
                 temp_pred.append((cur_logit[i][1], cur_ori[i]))
+            temp_pred2[cur_ori[i]] = cur_logit[i]
         if len(temp_pred)==0:
-            final_pred.append(0)
+            x = 0
         elif len(temp_pred)==1:
-            final_pred.append(temp_pred[0][1])
+            x = temp_pred[0][1]
         else:
             temp_pred = sorted(temp_pred, key = lambda x : x[0], reverse=True)
-            final_pred.append(temp_pred[0][1])
+            x = temp_pred[0][1]
+        final_pred.append(x)
+        cur_id = ids[data_edge[i]]
+        final_json[cur_id] = {'logit' : temp_pred2, 'prediction' : x, 'answer' : answer[i], 'correct' : True if x==answer[i] else False}
     f1 = f1_score(answer, final_pred, average = 'micro')
     print(f"f1 score : {f1}")
     if flag:
         wandb.log({'eval f1' : f1}, step = num_steps)
+        with open(f'../data/eval_pred_{num_steps}', 'w') as f:
+            json.dump(final_json, f, indent='\t')
     else:
         wandb.log({'test f1' : f1}, step = num_steps)
+        with open(f'../data/test_pred_{num_steps}', 'w') as f:
+            json.dump(final_json, f, indent='\t')
+    return f1
 
 def main():
     parser = argparse.ArgumentParser()
@@ -116,11 +132,11 @@ def main():
     parser.add_argument("--max_seq_length", default=512, type=int,
                         help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated.")
 
-    parser.add_argument("--train_batch_size", default=32, type=int,
+    parser.add_argument("--train_batch_size", default=64, type=int,
                         help="Batch size for training.")
-    parser.add_argument("--test_batch_size", default=32, type=int,
+    parser.add_argument("--test_batch_size", default=64, type=int,
                         help="Batch size for testing.")
-    parser.add_argument("--learning_rate", default=3e-5, type=float,
+    parser.add_argument("--learning_rate", default=1.5e-5, type=float,
                         help="The initial learning rate for Adam.")
     parser.add_argument("--gradient_accumulation_steps", default=2, type=int,
                         help="Number of updates steps to accumulate the gradients for, before performing a backward/update pass.")
@@ -135,7 +151,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
     parser.add_argument("--num_class", type=int, default=42)
-    parser.add_argument("--evaluation_steps", type=int, default=500,
+    parser.add_argument("--evaluation_steps", type=int, default=250,
                         help="Number of steps to evaluate the model")
 
     parser.add_argument("--dropout_prob", type=float, default=0.1)
@@ -145,12 +161,10 @@ def main():
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(args.device)
     args.n_gpu = torch.cuda.device_count()
     config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
     config.gradient_checkpointing = True
     model = RECSE_Model(args, config)
-    print(args.n_gpu)
     if args.n_gpu > 1:
         model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
     model.to(args.device)
@@ -158,8 +172,16 @@ def main():
     train_dataset = RE_dataset(args)
     eval_dataset = RE_dataset(args, do_eval = True)
     test_dataset = RE_dataset(args, do_eval = True, do_test = True)
+    print(f"train_dataset : {len(train_dataset)}")
+    print(f"eval_dataset : {len(eval_dataset)}")
+    print(f"test_dataset : {len(test_dataset)}")
+    counter = Counter(train_dataset.label)
+    print("class distribution of train_dataset : ",dict(counter))
+    args.save_path = '../checkpoint/'
+    os.makedirs(args.save_path, exist_ok=True)
 
-    train(model, args, train_dataset, eval_dataset, test_dataset)
+
+    train(model, args, train_dataset, eval_dataset)
 
     evaluate(model, args, test_dataset, 0, False)
 
