@@ -115,11 +115,11 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
     print(f"f1 score : {f1}")
     if flag:
         wandb.log({'eval f1' : f1}, step = num_steps)
-        with open(f'../data/eval_pred_{num_steps}', 'w') as f:
+        with open(f'../data/eval_pred_{num_steps}.json', 'w') as f:
             json.dump(final_json, f, indent='\t')
     else:
         wandb.log({'test f1' : f1}, step = num_steps)
-        with open(f'../data/test_pred_{num_steps}', 'w') as f:
+        with open(f'../data/test_pred_{num_steps}.json', 'w') as f:
             json.dump(final_json, f, indent='\t')
     return f1
 
@@ -127,6 +127,7 @@ def main():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--data_dir", default="../data/tacred", type=str)
+    parser.add_argument("--save_path", default="../checkpoint/", type=str)
     parser.add_argument("--model_name_or_path", default='ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli', type=str)
 
     parser.add_argument("--max_seq_length", default=512, type=int,
@@ -177,7 +178,6 @@ def main():
     print(f"test_dataset : {len(test_dataset)}")
     counter = Counter(train_dataset.label)
     print("class distribution of train_dataset : ",dict(counter))
-    args.save_path = '../checkpoint/'
     os.makedirs(args.save_path, exist_ok=True)
 
 
