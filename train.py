@@ -84,6 +84,7 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
         ids+=id
         labels+=label.tolist()
         label_oris+=label_ori
+    print(ids)
     data_edge = [0]
     final_pred = []
     for i in range(len(ids)-1):
@@ -110,7 +111,7 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
             temp_pred = sorted(temp_pred, key = lambda x : x[0], reverse=True)
             x = temp_pred[0][1]
         final_pred.append(x)
-        final_json[cur_id] = {'logit' : temp_pred2, 'prediction' : x, 'answer' : answer[i], 'correct' : True if x==answer[i] else False}
+        final_json[cur_id[0]] = {'logit' : temp_pred2, 'prediction' : x, 'answer' : answer[i], 'correct' : True if x==answer[i] else False}
     print(len(final_pred))
     print(len(answer))
     f1 = f1_score(answer, final_pred, average = 'micro')
