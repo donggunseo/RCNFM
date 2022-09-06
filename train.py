@@ -118,11 +118,11 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
     f1 = f1_score(answer, final_pred, average = 'micro')
     print(f"f1 score : {f1}")
     if flag:
-        wandb.log({'eval f1' : f1}, step = num_steps)
+        # wandb.log({'eval f1' : f1}, step = num_steps)
         with open(f'../data/eval_pred_{num_steps}.json', 'w') as f:
             json.dump(final_json, f, indent='\t')
     else:
-        wandb.log({'test f1' : f1}, step = num_steps)
+        # wandb.log({'test f1' : f1}, step = num_steps)
         with open(f'../data/test_pred.json', 'w') as f:
             json.dump(final_json, f, indent='\t')
     return f1
