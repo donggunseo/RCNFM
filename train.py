@@ -92,16 +92,16 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
     data_edge.append(len(ids))
     final_json = {}
     for i in tqdm(range(len(data_edge)-1)):
-        print(data_edge[i], " ", data_edge[i+1])
         cur_pred = preds[data_edge[i]:data_edge[i+1]]
         cur_logit = logits[data_edge[i]:data_edge[i+1]]
         cur_ori = label_oris[data_edge[i]:data_edge[i+1]]
+        cur_id = ids[data_edge[i]:data_edge[i+1]]
         temp_pred = []
         temp_pred2 = {}
-        for i in range(len(cur_pred)):
-            if cur_pred[i]==1:
-                temp_pred.append((cur_logit[i][1], cur_ori[i]))
-            temp_pred2[cur_ori[i]] = cur_logit[i]
+        for j in range(len(cur_pred)):
+            if cur_pred[j]==1:
+                temp_pred.append((cur_logit[j][1], cur_ori[j]))
+            temp_pred2[cur_ori[j]] = cur_logit[j]
         if len(temp_pred)==0:
             x = 0
         elif len(temp_pred)==1:
@@ -110,8 +110,6 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
             temp_pred = sorted(temp_pred, key = lambda x : x[0], reverse=True)
             x = temp_pred[0][1]
         final_pred.append(x)
-        cur_id = ids[data_edge[i]]
-        print(cur_id)
         final_json[cur_id] = {'logit' : temp_pred2, 'prediction' : x, 'answer' : answer[i], 'correct' : True if x==answer[i] else False}
     print(len(final_pred))
     print(len(answer))
