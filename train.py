@@ -18,7 +18,7 @@ from dataset import RE_dataset
 from collections import Counter
 import json
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
 def train(model, args, train_dataset, eval_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
@@ -154,20 +154,22 @@ def main():
     parser.add_argument("--num_class", type=int, default=42)
     parser.add_argument("--evaluation_steps", type=int, default=250,
                         help="Number of steps to evaluate the model")
+    parser.add_argument("--marker", type=bool, default = True)
+    parser.add_argument("--restriction", type=bool, default=True)
 
     parser.add_argument("--dropout_prob", type=float, default=0.1)
-    parser.add_argument("--project_name", type=str, default="RECSE")
+    parser.add_argument("--project_name", type=str, default="RCNFM")
     parser.add_argument("--run_name", type=str, default="tacred")
 
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
-    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args.device = torch.device("cuda:1,2,3" if torch.cuda.is_available() else "cpu")
     args.n_gpu = torch.cuda.device_count()
     config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
     config.gradient_checkpointing = True
     model = RECSE_Model(args, config)
     if args.n_gpu > 1:
-        model = nn.DataParallel(model, device_ids = list(range(args.n_gpu)))
+        model = nn.DataParallel(model, device_ids = [1,2,3])
     model.to(args.device)
     set_seed(args)
     train_dataset = RE_dataset(args)
@@ -176,8 +178,6 @@ def main():
     print(f"train_dataset : {len(train_dataset)}")
     print(f"eval_dataset : {len(eval_dataset)}")
     print(f"test_dataset : {len(test_dataset)}")
-    counter = Counter(train_dataset.label)
-    print("class distribution of train_dataset : ",dict(counter))
     os.makedirs(args.save_path, exist_ok=True)
 
 
