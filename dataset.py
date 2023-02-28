@@ -162,6 +162,9 @@ class RE_dataset(Dataset):
         with open(self.file_path, 'r') as file:
             data = json.load(file)
         for d in tqdm(data, desc = 'dataset preprocessing'):
+            label = LABEL_TO_ID[d['relation']]
+            if self.args.except_no_relation and label==0 and (not self.evaluate):
+                continue
             ss, se = d['subj_start'], d['subj_end']
             os, oe = d['obj_start'], d['obj_end']
             id = d['id']
@@ -183,7 +186,6 @@ class RE_dataset(Dataset):
                     if i == oe:
                         t = t + ["#"]
                 sentence.extend(t)
-            label = LABEL_TO_ID[d['relation']]
             subj_entity = ['@'] + ['*'] + subj_type + ['*'] if self.args.marker == True else []
             obj_entity = ["#"] + ['^'] + obj_type + ['^'] if self.args.marker == True else []
             for j, token in enumerate(tokens[ss:se+1]):

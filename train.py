@@ -1,4 +1,3 @@
-from cgi import test
 import os
 import torch
 import torch.nn as nn
@@ -8,7 +7,7 @@ import argparse
 from transformers import AutoConfig, AutoTokenizer
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 from torch.utils.data import DataLoader
-from utils import set_seed, collate_fn
+from utils import set_seed, collate_fn, get_f1
 from tqdm import tqdm
 import os
 import numpy as np
@@ -18,7 +17,7 @@ from dataset import RE_dataset
 from collections import Counter
 import json
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
 def train(model, args, train_dataset, eval_dataset):
     dataloader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last = True)
     total_steps = int(len(dataloader) * args.num_train_epochs // args.gradient_accumulation_steps)
@@ -29,11 +28,11 @@ def train(model, args, train_dataset, eval_dataset):
     optimizer = AdamW(model.parameters(), lr=args.learning_rate, eps=args.adam_epsilon)
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
     print('Total steps: {}'.format(total_steps))
-    print('Warmup steps: {}'.format(warmup_steps))
     
 
     num_steps = 0
     best_f1 = -1
+    best_epoch = -1
     for epoch in range(int(args.num_train_epochs)):
         model.zero_grad()
         for step, batch in enumerate(tqdm(dataloader)):
@@ -56,9 +55,12 @@ def train(model, args, train_dataset, eval_dataset):
                 wandb.log({'loss': loss.item()}, step=num_steps)
             # if (num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
         f1 = evaluate(model, args, eval_dataset, epoch)
+        wandb.log({'eval f1' : float(f1)}, step = epoch)
         if best_f1<f1:
-            torch.save(model.state_dict(), os.path.join(args.save_path, f'checkpoint_{epoch}.bin'))
+            torch.save(model.state_dict(), os.path.join(args.save_path, f'checkpoint_{epoch}_{f1}.bin'))
             best_f1 = f1
+            best_epoch = epoch
+    return best_f1, best_epoch
 
 def evaluate(model, args, test_dataset, num_steps, flag=True):
     softmax = torch.nn.Softmax(dim=-1)
@@ -111,15 +113,13 @@ def evaluate(model, args, test_dataset, num_steps, flag=True):
             x = temp_pred[0][1]
         final_pred.append(x)
         final_json[cur_id[0]] = {'logit' : temp_pred2, 'prediction' : x, 'answer' : answer[i], 'correct' : True if x==answer[i] else False}
-    f1 = f1_score(answer, final_pred, average = 'micro')
+    f1 = get_f1(answer, final_pred)
     print(f"f1 score : {f1}")
     if flag:
-        wandb.log({'eval f1' : f1}, step = num_steps)
-        with open(f'../data/eval_pred_{num_steps}.json', 'w') as f:
+        with open(os.path.join(args.save_path, f'eval_pred_{num_steps}_{f1}.json'), 'w') as f:
             json.dump(final_json, f, indent='\t')
     else:
-        wandb.log({'test f1' : f1}, step = num_steps)
-        with open(f'../data/test_pred.json', 'w') as f:
+        with open(os.path.join(args.save_path, f'test_pred_{f1}.json'), 'w') as f:
             json.dump(final_json, f, indent='\t')
     return f1
 
@@ -151,27 +151,29 @@ def main():
                         help="Total number of training epochs to perform.")
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
-    parser.add_argument("--num_class", type=int, default=42)
     parser.add_argument("--evaluation_steps", type=int, default=250,
                         help="Number of steps to evaluate the model")
     parser.add_argument("--marker", type=bool, default = True)
     parser.add_argument("--restriction", type=bool, default=True)
-
-    parser.add_argument("--dropout_prob", type=float, default=0.1)
     parser.add_argument("--project_name", type=str, default="RCNFM")
     parser.add_argument("--run_name", type=str, default="tacred")
+    parser.add_argument("--dropout_prob", type=float, default=0.1)
+    parser.add_argument("--except_no_relation", type=bool, default=False)
 
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
-    args.device = torch.device("cuda:1,2,3" if torch.cuda.is_available() else "cpu")
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     args.n_gpu = torch.cuda.device_count()
-    config = AutoConfig.from_pretrained(args.model_name_or_path, num_labels=2)
+    set_seed(args)
+    print(torch.cuda.current_device())
+    print(torch.cuda.device_count())
+    print(args.device)
+    config = AutoConfig.from_pretrained(args.model_name_or_path)
     config.gradient_checkpointing = True
     model = RECSE_Model(args, config)
     if args.n_gpu > 1:
-        model = nn.DataParallel(model, device_ids = [1,2,3])
+        model = nn.DataParallel(model)
     model.to(args.device)
-    set_seed(args)
     train_dataset = RE_dataset(args)
     eval_dataset = RE_dataset(args, do_eval = True)
     test_dataset = RE_dataset(args, do_eval = True, do_test = True)
@@ -181,18 +183,14 @@ def main():
     os.makedirs(args.save_path, exist_ok=True)
 
 
-    train(model, args, train_dataset, eval_dataset)
+    best_f1, best_epoch = train(model, args, train_dataset, eval_dataset)
+    
+    model.load_state_dict(torch.load(os.path.join(args.save_path, f'checkpoint_{best_epoch}_{best_f1}.bin')))
 
-    evaluate(model, args, test_dataset, 0, False)
+    test_f1, _ = evaluate(model, args, test_dataset, 0, False)
+    wandb.log({'test f1' : float(test_f1)}, step = 0)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
 
 

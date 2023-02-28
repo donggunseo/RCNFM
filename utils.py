@@ -21,3 +21,19 @@ def collate_fn(batch):
     labels = torch.tensor(labels, dtype=torch.long)
     output = (input_ids, input_mask, labels, ids, label_oris)
     return output
+
+def get_f1(answer, pred):
+    correct_by_relation = 0
+    guessed_by_relation = 0
+    gold_by_relation = 0
+    for i in range(len(answer)):
+        if answer[i]==pred[i] and pred[i]!=0:
+            correct_by_relation+=1
+        if pred[i]!=0:
+            guessed_by_relation+=1
+        if answer[i]!=0:
+            gold_by_relation+=1
+    prec_micro = float(correct_by_relation) / float(guessed_by_relation)
+    recall_micro = float(correct_by_relation) / float(gold_by_relation)
+    f1_micro = 2.0 * prec_micro * recall_micro / (prec_micro+recall_micro)
+    return f1_micro
