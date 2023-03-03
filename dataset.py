@@ -4,6 +4,7 @@ from transformers import AutoTokenizer
 import json
 import os
 from tqdm import tqdm
+import random
 
 LABEL_TO_ID = {
 	"no_relation": 0,
@@ -176,7 +177,7 @@ class RE_dataset(Dataset):
             obj_type = self.tokenizer.tokenize(d['obj_type'].replace("_", " ").lower())
             for i, token in enumerate(tokens):
                 t = self.tokenizer.tokenize(token)
-                if self.args.marker == True:
+                if self.args.remove_marker:
                     if i == ss:
                         t = ['@'] + ['*'] + subj_type + ['*'] + t
                     if i == se:
@@ -186,20 +187,29 @@ class RE_dataset(Dataset):
                     if i == oe:
                         t = t + ["#"]
                 sentence.extend(t)
-            subj_entity = ['@'] + ['*'] + subj_type + ['*'] if self.args.marker == True else []
-            obj_entity = ["#"] + ['^'] + obj_type + ['^'] if self.args.marker == True else []
+            subj_entity = ['@'] + ['*'] + subj_type + ['*'] if self.args.remove_marker else []
+            obj_entity = ["#"] + ['^'] + obj_type + ['^'] if self.args.remove_marker else []
             for j, token in enumerate(tokens[ss:se+1]):
                 t = self.tokenizer.tokenize(token)
                 subj_entity.extend(t)
-            if self.args.marker == True:
+            if self.args.remove_marker:
                 subj_entity.append('@') 
             for j, token in enumerate(tokens[os:oe+1]):
                 t = self.tokenizer.tokenize(token)
                 obj_entity.extend(t)
-            if self.args.marker == True:
+            if self.args.remove_marker:
                 obj_entity.append('#') 
 
-            candidate_relations_list = VALID_RELATION_FOR_PAIR[(subj_type_ori, obj_type_ori)] if self.args.restriction == True else list(LABEL_TO_ID.keys())[1:]
+            candidate_relations_list = VALID_RELATION_FOR_PAIR[(subj_type_ori, obj_type_ori)].copy() if self.args.no_restriction else list(LABEL_TO_ID.keys())[1:]
+            if self.args.zero_threshold and (not self.evaluate):
+                if d['relation']!='no_relation' and len(candidate_relations_list)>self.args.zero_threshold_num:
+                    temp = [d['relation']]
+                    candidate_relations_list.remove(d['relation'])
+                    temp.extend(random.sample(candidate_relations_list, self.args.zero_threshold_num-1))
+                    candidate_relations_list = temp
+                elif d['relation']=='no_relation' and len(candidate_relations_list)>self.args.zero_threshold_num:
+                    temp = random.sample(candidate_relations_list, self.args.zero_threshold_num)
+                    candidate_relations_list = temp
             binary_label_list= [0 if LABEL_TO_ID[k]!=label else 1 for k in candidate_relations_list]
             sentence2 = []
             for candidate_relation in candidate_relations_list:

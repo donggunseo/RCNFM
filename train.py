@@ -153,12 +153,15 @@ def main():
                         help="random seed for initialization")
     parser.add_argument("--evaluation_steps", type=int, default=250,
                         help="Number of steps to evaluate the model")
-    parser.add_argument("--marker", type=bool, default = True)
-    parser.add_argument("--restriction", type=bool, default=True)
+    parser.add_argument("--no_restriction", action = 'store_false', default=True)
     parser.add_argument("--project_name", type=str, default="RCNFM")
     parser.add_argument("--run_name", type=str, default="tacred")
     parser.add_argument("--dropout_prob", type=float, default=0.1)
-    parser.add_argument("--except_no_relation", type=bool, default=False)
+    parser.add_argument("--except_no_relation", action = 'store_true', default=False)
+    parser.add_argument("--zero_threshold", action = 'store_true', default=False)
+    parser.add_argument("--zero_threshold_num", type=int, default=3)
+    parser.add_argument("--remove_marker", action ='store_false', default=True)
+    parser.add_argument("--pooler", action ="store_true", default = False)
 
     args = parser.parse_args()
     wandb.init(project=args.project_name, name=args.run_name)
@@ -187,7 +190,7 @@ def main():
     
     model.load_state_dict(torch.load(os.path.join(args.save_path, f'checkpoint_{best_epoch}_{best_f1}.bin')))
 
-    test_f1, _ = evaluate(model, args, test_dataset, 0, False)
+    test_f1 = evaluate(model, args, test_dataset, 0, False)
     wandb.log({'test f1' : float(test_f1)}, step = 0)
 
 if __name__ == "__main__":

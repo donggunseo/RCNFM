@@ -11,11 +11,15 @@ class RECSE_Model(nn.Module):
         self.model = AutoModel.from_pretrained(self.model_name_or_path, config=config)
         self.classifier = nn.Linear(1024, 2)
         self.dropout = nn.Dropout(args.dropout_prob)
+        self.args = args
     
     @autocast()
     def forward(self, input_ids=None, attention_mask=None):
         output = self.model(input_ids, attention_mask = attention_mask)
-        pooled_cls_output = output[0][:,0]
+        if self.args.pooler:
+            pooled_cls_output = output[1]
+        else:
+            pooled_cls_output = output[0][:,0]
         pooled_cls_output = self.dropout(pooled_cls_output)
         cls_output = self.classifier(pooled_cls_output)
         return cls_output
