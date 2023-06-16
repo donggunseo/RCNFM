@@ -1,1 +1,0 @@
-python train.py --run_name tacred_batch64 --save_path ../checkpoint/batch64

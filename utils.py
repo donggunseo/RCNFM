@@ -33,7 +33,13 @@ def get_f1(answer, pred):
             guessed_by_relation+=1
         if answer[i]!=0:
             gold_by_relation+=1
-    prec_micro = float(correct_by_relation) / float(guessed_by_relation)
-    recall_micro = float(correct_by_relation) / float(gold_by_relation)
-    f1_micro = 2.0 * prec_micro * recall_micro / (prec_micro+recall_micro)
+    prec_micro = 1.0
+    if guessed_by_relation > 0 :
+        prec_micro = float(correct_by_relation) / float(guessed_by_relation)
+    recall_micro = 1.0
+    if gold_by_relation > 0 :  
+        recall_micro = float(correct_by_relation) / float(gold_by_relation)
+    f1_micro = 0.0
+    if prec_micro + recall_micro > 0.0:
+        f1_micro = 2.0 * prec_micro * recall_micro / (prec_micro+recall_micro)
     return f1_micro
